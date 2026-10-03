@@ -24,4 +24,4 @@ Framework preset: `None`. Build command: vazio. Build output directory: `public`
 
 Nome: Pedro Henrique Moraes Proença
 RA: 2026109691
-URL: https://
+URL: https://avaliacao2bi.pages.dev/
