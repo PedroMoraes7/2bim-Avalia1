@@ -1,29 +1,29 @@
 // Variável global para armazenar o token do Google
 let tokenGoogle = "";
 
-// Função chamada automaticamente pelo Google após o login
-// Ela PRECISA ser global para o botão do Google enxergá-la
 window.handleCredentialResponse = function(response) {
     tokenGoogle = response.credential;
     const resultadoDiv = document.getElementById("resultado");
     if (resultadoDiv) {
-        resultadoDiv.innerHTML = "<p style='color: green;'>Login realizado com sucesso! Você já pode gerar o desenho.</p>";
+        resultadoDiv.innerHTML = "<p style='color: green;'>Login realizado com sucesso! Já pode gerar o desenho.</p>";
     }
     console.log("Token recebido com sucesso.");
 };
 
-// Garante que o código só adicione os eventos após o HTML carregar completamente
 document.addEventListener("DOMContentLoaded", function() {
     const formulario = document.getElementById("formulario");
     
     if (formulario) {
         formulario.addEventListener("submit", async function(event) {
-            // Impede o recarregamento padrão da página (ESSENCIAL)
             event.preventDefault(); 
 
             const resultadoDiv = document.getElementById("resultado");
             const numeroInput = document.getElementById("numero");
+            const btnBaixar = document.getElementById("btn-baixar");
             
+            // Esconde o botão ao tentar gerar um desenho novo
+            if (btnBaixar) btnBaixar.style.display = "none";
+
             if (!numeroInput) {
                 resultadoDiv.innerHTML = "<p style='color: red;'>Erro: Campo de número não encontrado.</p>";
                 return;
@@ -31,16 +31,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
             const numero = parseInt(numeroInput.value, 10);
 
-            // Verifica se o usuário tem o token antes de enviar
             if (!tokenGoogle) {
-                resultadoDiv.innerHTML = "<p style='color: red;'>Erro: Você precisa fazer o login com o Google primeiro.</p>";
+                resultadoDiv.innerHTML = "<p style='color: red;'>Erro: Precisa de fazer o login com o Google primeiro.</p>";
                 return;
             }
 
-            resultadoDiv.innerHTML = "<p>Enviando para o servidor e gerando desenho...</p>";
+            resultadoDiv.innerHTML = "<p>A enviar para o servidor e a gerar o desenho...</p>";
 
             try {
-                // Faz a requisição POST para a API[cite: 4]
                 const response = await fetch('/api/desenho', {
                     method: 'POST',
                     headers: {
@@ -50,10 +48,26 @@ document.addEventListener("DOMContentLoaded", function() {
                     body: JSON.stringify({ numero: numero })
                 });
 
-                // Tratamento das respostas conforme o contrato da API[cite: 4]
                 if (response.status === 200) {
                     const svgText = await response.text();
                     resultadoDiv.innerHTML = svgText;
+                    
+                    // Exibe o botão e cria a ação de transferência do ficheiro
+                    if (btnBaixar) {
+                        btnBaixar.style.display = "block";
+                        btnBaixar.onclick = function() {
+                            // Converte o texto SVG para um ficheiro transferível
+                            const blob = new Blob([svgText], { type: 'image/svg+xml' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'exemplo.svg'; // Nome exigido na atividade
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        };
+                    }
                 } else if (response.status === 400) {
                     resultadoDiv.innerHTML = "<p style='color: red;'>Erro 400: O número enviado é inválido. Use um inteiro de 1 a 100.</p>";
                 } else if (response.status === 401) {
@@ -64,11 +78,9 @@ document.addEventListener("DOMContentLoaded", function() {
                     resultadoDiv.innerHTML = `<p style='color: red;'>Erro inesperado. Código: ${response.status}</p>`;
                 }
             } catch (error) {
-                resultadoDiv.innerHTML = "<p style='color: red;'>Erro ao conectar com o servidor. Verifique o console.</p>";
+                resultadoDiv.innerHTML = "<p style='color: red;'>Erro ao conectar com o servidor. Verifique a consola.</p>";
                 console.error("Erro na requisição:", error);
             }
         });
-    } else {
-        console.error("Formulário com ID 'formulario' não encontrado no HTML.");
     }
 });
