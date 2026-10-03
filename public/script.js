@@ -1,46 +1,53 @@
-// script.js
-// Versao inicial: todo o trabalho acontece no navegador.
-// A tarefa consiste em levar gerarDesenho para o servidor (Pages Functions)
-// e fazer esta pagina apenas enviar o numero e exibir a resposta.
+let tokenGoogle = "";
 
-import { gerarDesenho, numeroValido } from "./desenho.js";
+// Função chamada automaticamente pelo Google após o login
+function handleCredentialResponse(response) {
+    tokenGoogle = response.credential;
+    document.getElementById("resultado").innerHTML = "<p style='color: green;'>Login realizado com sucesso! Você já pode gerar o desenho.</p>";
+}
 
-const formulario = document.getElementById("formulario");
-const campoNumero = document.getElementById("numero");
-const campoEmail = document.getElementById("email");
-const area = document.getElementById("desenho");
-const mensagem = document.getElementById("mensagem");
-const botaoBaixar = document.getElementById("baixar");
+// Intercepta o envio do formulário
+document.getElementById("formulario").addEventListener("submit", async function(event) {
+    event.preventDefault(); // Evita que a página recarregue
 
-let svgAtual = "";
+    const resultadoDiv = document.getElementById("resultado");
+    const numero = parseInt(document.getElementById("numero").value, 10);
 
-formulario.addEventListener("submit", (evento) => {
-  evento.preventDefault();
-  mensagem.textContent = "";
+    // Verifica se o usuário fez o login antes de tentar gerar
+    if (!tokenGoogle) {
+        resultadoDiv.innerHTML = "<p style='color: red;'>Erro: Você precisa fazer o login com o Google primeiro.</p>";
+        return;
+    }
 
-  const numero = Number(campoNumero.value);
-  const email = campoEmail.value.trim();
+    resultadoDiv.innerHTML = "<p>Gerando desenho...</p>";
 
-  if (!numeroValido(numero)) {
-    mensagem.textContent = "Digite um inteiro entre 1 e 100.";
-    return;
-  }
-  if (email === "") {
-    mensagem.textContent = "Informe um e-mail.";
-    return;
-  }
+    try {
+        // Faz a requisição POST para a nossa API
+        const response = await fetch('/api/desenho', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tokenGoogle}`
+            },
+            body: JSON.stringify({ numero: numero })
+        });
 
-  svgAtual = gerarDesenho(numero, email);
-  area.innerHTML = svgAtual;
-  botaoBaixar.hidden = false;
-});
-
-botaoBaixar.addEventListener("click", () => {
-  const arquivo = new Blob([svgAtual], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(arquivo);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "exemplo.svg";
-  link.click();
-  URL.revokeObjectURL(url);
+        if (response.status === 200) {
+            // Sucesso: exibe o SVG na tela
+            const svgText = await response.text();
+            resultadoDiv.innerHTML = svgText;
+        } else if (response.status === 400) {
+            // Erro 400: Corpo inválido ou número fora do limite
+            resultadoDiv.innerHTML = "<p style='color: red;'>Erro 400: O número enviado é inválido. Certifique-se de usar um número inteiro de 1 a 100.</p>";
+        } else if (response.status === 401) {
+            // Erro 401: Problema com o token
+            resultadoDiv.innerHTML = "<p style='color: red;'>Erro 401: Não autorizado. Faça o login novamente. Token ausente ou inválido.</p>";
+        } else {
+            // Outros erros
+            resultadoDiv.innerHTML = `<p style='color: red;'>Erro inesperado. Código: ${response.status}</p>`;
+        }
+    } catch (error) {
+        resultadoDiv.innerHTML = "<p style='color: red;'>Erro ao conectar com o servidor.</p>";
+        console.error(error);
+    }
 });
